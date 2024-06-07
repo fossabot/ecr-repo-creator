@@ -57,6 +57,11 @@ func extractRepoName(ecrURL string) string {
 
 	split_url := strings.Split(ecrURL, "/")
 
+	last_part := split_url[len(split_url)-1]
+	if strings.Contains(last_part, ":") {
+		split_url[len(split_url)-1] = strings.Split(last_part, ":")[0]
+	}
+
 	if strings.Contains(split_url[0], ".amazonaws.com") {
 		return strings.Join(split_url[1:], "/")
 	}
