@@ -1,12 +1,11 @@
 package main
 
-// Thanks to chatgpt
-
 import (
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -50,15 +49,32 @@ func createECRRepository(repoName, region string) error {
 	return nil
 }
 
+// extractRepoName strips the ECR URL to get the repository name.
+func extractRepoName(ecrURL string) string {
+	for strings.HasSuffix(ecrURL, "/") {
+		ecrURL = ecrURL[:len(ecrURL)-1]
+	}
+
+	split_url := strings.Split(ecrURL, "/")
+
+	if strings.Contains(split_url[0], ".amazonaws.com") {
+		return strings.Join(split_url[1:], "/")
+	}
+
+	return strings.Join(split_url, "/")
+}
+
 func main() {
 	region := flag.String("region", "eu-west-1", "AWS region to use")
 	flag.Parse()
 
 	if len(flag.Args()) < 1 {
-		log.Fatalf("Usage: %s [--region region] <repository-name>\n", os.Args[0])
+		log.Fatalf("Usage: %s [--region region] <repository-url-or-name>\n", os.Args[0])
 	}
 
-	repoName := flag.Arg(0)
+	repoInput := flag.Arg(0)
+
+	repoName := extractRepoName(repoInput)
 
 	err := createECRRepository(repoName, *region)
 	if err != nil {
