@@ -1,4 +1,4 @@
-module ecr-repo-creator
+module github.com/babs/ecr-repo-creator
 
 go 1.22.1
 
