@@ -1,38 +1,49 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ecr"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ecr"
+	"github.com/aws/smithy-go"
 )
 
 // createECRRepository creates an ECR repository if it does not exist.
 func createECRRepository(repoName, region string) error {
 	// Create a new session using the default credentials and region from the environment.
-	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(region),
-	})
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
 	if err != nil {
 		return fmt.Errorf("failed to create session: %v", err)
 	}
 
-	svc := ecr.New(sess)
+	ecrClient := ecr.NewFromConfig(cfg)
 
 	// Check if the repository exists
 	describeInput := &ecr.DescribeRepositoriesInput{
-		RepositoryNames: []*string{aws.String(repoName)},
+		RepositoryNames: []string{repoName},
 	}
 
-	_, err = svc.DescribeRepositories(describeInput)
+	_, err = ecrClient.DescribeRepositories(context.TODO(), describeInput)
 	if err == nil {
 		log.Printf("Repository %s already exists.\n", repoName)
 		return nil
+	} else {
+		var ae smithy.APIError
+		if errors.As(err, &ae) {
+			if ae.ErrorCode() != "RepositoryNotFoundException" {
+				log.Printf("code: %s, message: %s, fault: %s", ae.ErrorCode(), ae.ErrorMessage(), ae.ErrorFault().String())
+				return err
+			}
+		} else {
+			return err
+		}
 	}
 
 	// If the repository does not exist, create it
@@ -40,7 +51,7 @@ func createECRRepository(repoName, region string) error {
 		RepositoryName: aws.String(repoName),
 	}
 
-	_, err = svc.CreateRepository(createInput)
+	_, err = ecrClient.CreateRepository(context.TODO(), createInput)
 	if err != nil {
 		return fmt.Errorf("failed to create repository: %v", err)
 	}
