@@ -5,11 +5,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	"github.com/aws/smithy-go"
@@ -26,19 +26,21 @@ func createECRRepository(repoName, region string) error {
 	ecrClient := ecr.NewFromConfig(cfg)
 
 	// Check if the repository exists
-	describeInput := &ecr.DescribeRepositoriesInput{
-		RepositoryNames: []string{repoName},
-	}
+	_, err = ecrClient.DescribeRepositories(
+		context.TODO(),
+		&ecr.DescribeRepositoriesInput{
+			RepositoryNames: []string{repoName},
+		},
+	)
 
-	_, err = ecrClient.DescribeRepositories(context.TODO(), describeInput)
 	if err == nil {
-		log.Printf("Repository %s already exists.\n", repoName)
+		log.Infof("Repository %s already exists.", repoName)
 		return nil
 	} else {
 		var ae smithy.APIError
 		if errors.As(err, &ae) {
 			if ae.ErrorCode() != "RepositoryNotFoundException" {
-				log.Printf("code: %s, message: %s, fault: %s", ae.ErrorCode(), ae.ErrorMessage(), ae.ErrorFault().String())
+				log.Infof("code: %s, message: %s, fault: %s", ae.ErrorCode(), ae.ErrorMessage(), ae.ErrorFault().String())
 				return err
 			}
 		} else {
@@ -47,16 +49,40 @@ func createECRRepository(repoName, region string) error {
 	}
 
 	// If the repository does not exist, create it
-	createInput := &ecr.CreateRepositoryInput{
-		RepositoryName: aws.String(repoName),
-	}
-
-	_, err = ecrClient.CreateRepository(context.TODO(), createInput)
+	_, err = ecrClient.CreateRepository(
+		context.TODO(),
+		&ecr.CreateRepositoryInput{
+			RepositoryName: &repoName,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create repository: %v", err)
 	}
 
-	log.Printf("Repository %s created successfully.\n", repoName)
+	log.Infof("repository %s created successfully", repoName)
+
+	policy := os.Getenv("REPOSITORY_POLICY")
+	if policy != "" {
+		_, err = ecrClient.SetRepositoryPolicy(context.TODO(),
+			&ecr.SetRepositoryPolicyInput{
+				PolicyText:     &policy,
+				RepositoryName: &repoName,
+			},
+		)
+		if err != nil {
+			var oe *smithy.OperationError
+			if errors.As(err, &oe) {
+				log.Warnf("failed to call service: %s, operation: %s, error: %v", oe.Service(), oe.Operation(), oe.Unwrap())
+			} else {
+				log.Warnf("error while applying policy: %v", err)
+			}
+		} else {
+			log.Info("policy applied")
+		}
+	} else {
+		log.Info("no policy provided")
+	}
+
 	return nil
 }
 
