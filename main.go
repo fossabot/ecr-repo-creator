@@ -107,11 +107,17 @@ func extractRepoName(ecrURL string) string {
 }
 
 func main() {
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [--region region] <repository-url-or-name>\n\nEnvironment variable:\n REPOSITORY_POLICY: repository policy to set upon repository creation\n\nargs:\n", os.Args[0])
+		flag.PrintDefaults()
+	}
+
 	region := flag.String("region", "eu-west-1", "AWS region to use")
 	flag.Parse()
 
 	if len(flag.Args()) < 1 {
-		log.Fatalf("Usage: %s [--region region] <repository-url-or-name>\n", os.Args[0])
+		log.Fatalf("missing repository name")
+		flag.PrintDefaults()
 	}
 
 	repoInput := flag.Arg(0)
@@ -120,6 +126,6 @@ func main() {
 
 	err := createECRRepository(repoName, *region)
 	if err != nil {
-		log.Fatalf("Error: %v", err)
+		log.Fatalf("error: %v", err)
 	}
 }
