@@ -12,4 +12,5 @@ RUN set -xe \
 
 FROM gcr.io/kaniko-project/executor:${KANIKO_VERSION}-debug AS final-stage
 
+COPY --from=ghcr.io/jqlang/jq /jq /usr/local/bin/
 COPY --from=0 /app/ecr-repo-creator /usr/local/bin/
