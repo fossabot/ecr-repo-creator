@@ -61,11 +61,11 @@ func createECRRepository(repoName, region string) error {
 
 	log.Infof("repository %s created successfully", repoName)
 
-	policy := os.Getenv("REPOSITORY_POLICY")
-	if policy != "" {
+	repositoryPolicy := os.Getenv("REPOSITORY_POLICY")
+	if repositoryPolicy != "" {
 		_, err = ecrClient.SetRepositoryPolicy(context.TODO(),
 			&ecr.SetRepositoryPolicyInput{
-				PolicyText:     &policy,
+				PolicyText:     &repositoryPolicy,
 				RepositoryName: &repoName,
 			},
 		)
@@ -74,13 +74,35 @@ func createECRRepository(repoName, region string) error {
 			if errors.As(err, &oe) {
 				log.Warnf("failed to call service: %s, operation: %s, error: %v", oe.Service(), oe.Operation(), oe.Unwrap())
 			} else {
-				log.Warnf("error while applying policy: %v", err)
+				log.Warnf("error while applying repository policy: %v", err)
 			}
 		} else {
-			log.Info("policy applied")
+			log.Info("repository policy applied")
 		}
 	} else {
-		log.Info("no policy provided")
+		log.Info("no repository policy provided")
+	}
+
+	lifecyclePolicy := os.Getenv("LIFECYCLE_POLICY")
+	if lifecyclePolicy != "" {
+		_, err = ecrClient.PutLifecyclePolicy(context.TODO(),
+			&ecr.PutLifecyclePolicyInput{
+				LifecyclePolicyText: &lifecyclePolicy,
+				RepositoryName:      &repoName,
+			},
+		)
+		if err != nil {
+			var oe *smithy.OperationError
+			if errors.As(err, &oe) {
+				log.Warnf("failed to call service: %s, operation: %s, error: %v", oe.Service(), oe.Operation(), oe.Unwrap())
+			} else {
+				log.Warnf("error while applying lifecycle policy: %v", err)
+			}
+		} else {
+			log.Info("lifecycle policy applied")
+		}
+	} else {
+		log.Info("no lifecycle policy provided")
 	}
 
 	return nil
@@ -108,7 +130,7 @@ func extractRepoName(ecrURL string) string {
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [--region region] <repository-url-or-name>\n\nEnvironment variable:\n REPOSITORY_POLICY: repository policy to set upon repository creation\n\nargs:\n", os.Args[0])
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [--region region] <repository-url-or-name>\n\nEnvironment variable:\n REPOSITORY_POLICY: repository policy to set upon repository creation\n LIFECYCLE_POLICY: lifecycle policy to set upon repository creation\n\nargs:\n", os.Args[0])
 		flag.PrintDefaults()
 	}
 
