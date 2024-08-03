@@ -1,6 +1,8 @@
 # ecr-repo-creator
 
-Small tool to create AWS ECR repository if missing.
+Small tool to create AWS ECR repository if missing, static build to have no dependencies.
+
+There is also an example of Gitlab CI component that using it in [glci-example](./glci-example) ;-)
 
 ## Usage
 
@@ -37,3 +39,10 @@ docker build -t new-build-image:latest --build-arg GOLANG_VERSION=1.22.5 --build
 For Kaniko version: https://github.com/GoogleContainerTools/kaniko/releases
 
 For Golang version: https://hub.docker.com/_/golang
+
+
+A prebuilt image of `kaniko` with `ecr-repo-creator` and `jq` is available at [beardedbabs/kaniko-w-ecr-repo-creator](https://hub.docker.com/r/beardedbabs/kaniko-w-ecr-repo-creator) 
+
+```bash
+docker pull beardedbabs/kaniko-w-ecr-repo-creator:latest
+```
