@@ -46,6 +46,9 @@ All default values are sensible for the platform but can be overridden. It requi
 - `cache_run_layers`: when cache is enabled, cache `RUN` layers, default `true`
 - `use_new_run`: use new `RUN` implementation default: `true` [see doc for more details](https://github.com/GoogleContainerTools/kaniko?tab=readme-ov-file#flag---use-new-run)
 - `build_args`: build arg to pass, defined as an array of string, no need to quote more than YAML requires, ex ["MY_BUILD_ARG=foo bar"], default: `[]`
+- `build_args_w_subst`: build arg to pass to kaniko, through [a8m's `envsubst`](https://github.com/a8m/envsubst).
+    Like `build_args` but with substitution, evaluated just before kaniko's call in the job's context, ex ["CI_JOB_STARTED_AT=$CI_JOB_STARTED_AT"], default: `[]` \
+    Can be useful to break cache chain on purpose at a specific operation during build by using a changing variable as `ARG` in the middle of the `Dockerfile` like `ARG CI_JOB_STARTED_AT` (all subsequent calls to `COPY` / `RUN` won't rely on cache, [see kaniko doc about cache](https://github.com/GoogleContainerTools/kaniko?tab=readme-ov-file#caching))
 
 #### Options for multiple inclusion
 

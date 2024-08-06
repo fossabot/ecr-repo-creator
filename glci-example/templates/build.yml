@@ -67,6 +67,9 @@ spec:
     build_args:
       type: array
       default: []
+    build_args_w_subst:
+      type: array
+      default: []
 ---
 
 variables:
@@ -269,6 +272,7 @@ $[[ inputs.job_name ]]:
         echo --destination=$IMAGE_NAME:$TAG >>$KE_ARG_FILE
       done
       echo '$[[ inputs.build_args ]]' | jq -r '.[]|("--build-arg="+.)' >>$KE_ARG_FILE
+      echo '$[[ inputs.build_args_w_subst ]]' | jq -r '.[]|("--build-arg="+.)' | envsubst >>$KE_ARG_FILE
       echo --label=CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME >>$KE_ARG_FILE
       echo --label=CI_JOB_URL=$CI_JOB_URL >>$KE_ARG_FILE
       echo --label=CI_JOB_STARTED_AT=$CI_JOB_STARTED_AT >>$KE_ARG_FILE
