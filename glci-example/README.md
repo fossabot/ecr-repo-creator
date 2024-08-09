@@ -32,16 +32,17 @@ All default values are sensible for the platform but can be overridden. It requi
 
 #### Standard options
 
-- `tags`: runner tags, default: `shared-services`
+- `runner_tags`: runner tags, default: `shared-services`
 - `stage`: stage to register the job in, default: `build`
 - `parallel_matrix`: job parallelization definition, defaults to a single job
 - `needs`: job needs, default none (`[]`)
 - `dependencies`: job needs, default none (`[]`)
 - `rules`: trigger rules, default to semver tag, develop branch and web pipelines
 
-#### Kaniko specific args
+#### Kaniko/Image specific args
 
-- `cache`: enable or disable the cache (default `true`)
+- `tag_template`: template to derive tag from when not a semver commit tag (default `${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-${CI_PIPELINE_ID}`)
+- `cache`: enable or disable the cache (default `false`)
 - `cache_copy_layers`: when cache is enabled, cache `COPY` layers, default `true`
 - `cache_run_layers`: when cache is enabled, cache `RUN` layers, default `true`
 - `use_new_run`: use new `RUN` implementation default: `true` [see doc for more details](https://github.com/GoogleContainerTools/kaniko?tab=readme-ov-file#flag---use-new-run)

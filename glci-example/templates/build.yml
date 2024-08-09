@@ -1,6 +1,6 @@
 spec:
   inputs:
-    tags:
+    runner_tags:
       default: shared-services
     stage:
       default: build
@@ -10,6 +10,9 @@ spec:
     dockerfile_name:
       type: string
       default: Dockerfile
+    tag_template:
+      type: string
+      default: ${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-${CI_PIPELINE_ID}
     dependencies:
       type: array
       default: []
@@ -17,7 +20,7 @@ spec:
       type: array
       default: []
     cache:
-      default: "true"
+      default: "false"
       options:
         - "true"
         - "false"
@@ -103,7 +106,7 @@ $[[ inputs.job_name ]]:
       name: beardedbabs/kaniko-w-ecr-repo-creator:latest
       entrypoint: [""]
   tags:
-    - $[[ inputs.tags ]]
+    - $[[ inputs.runner_tags ]]
   rules:
     - $[[ inputs.rules ]]
   needs:
@@ -158,19 +161,25 @@ $[[ inputs.job_name ]]:
       if [ -n "${CI_COMMIT_TAG:-}" ]; then
         IMG_TAGS=${CI_COMMIT_TAG#v}
         if [ "${$[[ inputs.env_var_prefix ]]_SEMVER_MULTITAG}" = "true" -a -n "$(echo $IMG_TAGS | grep -iE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.-]+)?$')" ]; then
-          RELEASE="${IMG_TAGS#*-}"
-          [ -n "$RELEASE" ] && RELEASE="-$RELEASE"
+          RELEASE=""
+          case "$IMG_TAGS" in
+            *-*)
+              RELEASE="-${IMG_TAGS#*-}"
+              ;;
+          esac
           SEMVER_CORE="${IMG_TAGS%%-*}"
           [ "${$[[ inputs.env_var_prefix ]]_SEMVER_MULTITAG_INC_REL}" = "false" ] && RELEASE=""
           IMG_TAGS="$IMG_TAGS ${SEMVER_CORE%.*}${RELEASE} ${SEMVER_CORE%%.*}${RELEASE}"
         fi
       else
-        IMG_TAGS=${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-${CI_PIPELINE_ID}
+        IMG_TAGS="$[[ inputs.tag_template ]]"
       fi
 
       [ -n "${$[[ inputs.env_var_prefix ]]_FORCE_TAG:-}" ] && IMG_TAGS="${$[[ inputs.env_var_prefix ]]_FORCE_TAG}"
 
       for TAG in ${$[[ inputs.env_var_prefix ]]_ADDITIONNAL_TAGS:-}; do IMG_TAGS="$IMG_TAGS ${TAG}"; done
+
+      IMG_TAGS="$(echo "$IMG_TAGS" | envsubst)"
 
     - |
       # Define the proper Dockerfile
