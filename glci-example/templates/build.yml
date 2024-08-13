@@ -24,6 +24,11 @@ spec:
       options:
         - "true"
         - "false"
+    single_snapshot:
+      default: "true"
+      options:
+        - "true"
+        - "false"
     use_new_run:
       default: "true"
       options:
@@ -273,6 +278,18 @@ $[[ inputs.job_name ]]:
           ;;
       esac
       echo --use-new-run=$USE_NEW_RUN >>$KE_ARG_FILE
+
+      # single-snapshot
+      SINGLE_SNAPSHOT=$[[ inputs.single_snapshot ]]
+      case "${$[[ inputs.env_var_prefix ]]_KANIKO_SET_SINGLE_SNAPSHOT:-default}" in
+        true)
+          SINGLE_SNAPSHOT=true
+          ;;
+        false)
+          SINGLE_SNAPSHOT=false
+          ;;
+      esac
+      echo --single-snapshot=$SINGLE_SNAPSHOT >>$KE_ARG_FILE
 
       echo --image-name-tag-with-digest-file=/dev/termination-log >>$KE_ARG_FILE
       echo --context=${CI_PROJECT_DIR} >>$KE_ARG_FILE
