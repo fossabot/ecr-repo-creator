@@ -25,7 +25,7 @@ spec:
         - "true"
         - "false"
     single_snapshot:
-      default: "true"
+      default: "false"
       options:
         - "true"
         - "false"
