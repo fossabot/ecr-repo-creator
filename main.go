@@ -55,8 +55,20 @@ func createECRRepository(repoName, region string) error {
 			RepositoryName: &repoName,
 		},
 	)
+
 	if err != nil {
-		return fmt.Errorf("failed to create repository: %v", err)
+		var ae smithy.APIError
+		if errors.As(err, &ae) {
+			if ae.ErrorCode() != "RepositoryAlreadyExistsException" {
+				log.Infof("failed to create repository code: %s, message: %s, fault: %s", ae.ErrorCode(), ae.ErrorMessage(), ae.ErrorFault().String())
+				return err
+			} else {
+				log.Warnf("repository seems to have been created in the mean time, race condition ? code: %s, message: %s, fault: %s", ae.ErrorCode(), ae.ErrorMessage(), ae.ErrorFault().String())
+				return nil
+			}
+		} else {
+			return err
+		}
 	}
 
 	log.Infof("repository %s created successfully", repoName)
@@ -135,6 +147,7 @@ func main() {
 	}
 
 	region := flag.String("region", "eu-west-1", "AWS region to use")
+
 	flag.Parse()
 
 	if len(flag.Args()) < 1 {
