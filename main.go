@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -140,9 +141,18 @@ func extractRepoName(ecrURL string) string {
 	return strings.Join(split_url, "/")
 }
 
+func getVersion() string {
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "couldn't read build info"
+	}
+
+	return fmt.Sprintf("%s version %s", bi.Path, bi.Main.Version)
+}
+
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [--region region] <repository-url-or-name>\n\nEnvironment variable:\n REPOSITORY_POLICY: repository policy to set upon repository creation\n LIFECYCLE_POLICY: lifecycle policy to set upon repository creation\n\nargs:\n", os.Args[0])
+		fmt.Fprintf(flag.CommandLine.Output(), "%s\nUsage: %s [--region region] <repository-url-or-name>\n\nEnvironment variable:\n REPOSITORY_POLICY: repository policy to set upon repository creation\n LIFECYCLE_POLICY: lifecycle policy to set upon repository creation\n\nargs:\n", getVersion(), os.Args[0])
 		flag.PrintDefaults()
 	}
 
