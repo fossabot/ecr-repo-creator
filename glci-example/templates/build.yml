@@ -192,7 +192,7 @@ $[[ inputs.job_name ]]:
     - |
       # Define the proper Dockerfile
       CONTEXT_SUBDIR="${$[[ inputs.env_var_prefix ]]_CONTEXT_SUBDIR:-$[[ inputs.context_subdir ]]}"
-      DOCKERFILE="${CI_PROJECT_DIR}/${CONTEXT_SUBDIR%%/}/${$[[ inputs.env_var_prefix ]]_DOCKERFILE_NAME:-$[[ inputs.dockerfile_name ]]}"
+      DOCKERFILE="$(echo "${CI_PROJECT_DIR}/${CONTEXT_SUBDIR}/${$[[ inputs.env_var_prefix ]]_DOCKERFILE_NAME:-$[[ inputs.dockerfile_name ]]}" | tr -s /)"
       if [ -n "${COMPONENT:-}" ]; then
         if [ -e "${CI_PROJECT_DIR}/docker/build/${COMPONENT}/Dockerfile" ]; then
           DOCKERFILE="${CI_PROJECT_DIR}/docker/build/${COMPONENT}/Dockerfile"
