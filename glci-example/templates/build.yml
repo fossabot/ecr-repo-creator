@@ -135,12 +135,12 @@ $[[ inputs.job_name ]]:
       function error_banner () {
         local MSG="$1"
         MSG_MAX_LEN=$(echo -e "$MSG" | wc -L)
-        SEPARATOR="$(printf -- "=%.s" $(seq 1 $(($MSG_MAX_LEN+4))))"
-        echo -e "\e[1;41;37m${SEPARATOR}\e[0m"
+        SEPARATOR="$(printf -- "═%.s" $(seq 1 $(($MSG_MAX_LEN+2))))"
+        echo -e "\e[1;41;37m╔${SEPARATOR}╗\e[0m"
         echo -e "$MSG" | while read LINE; do
-          printf "\e[1;41;37m> %-${MSG_MAX_LEN}s <\e[0m\n" "$LINE"
+          printf "\e[1;41;37m║ %-${MSG_MAX_LEN}s ║\e[0m\n" "$LINE"
         done
-        echo -e "\e[1;41;37m${SEPARATOR}\e[0m"
+        echo -e "\e[1;41;37m╚${SEPARATOR}╝\e[0m"
       }
     - |-
       # Section Variable configuration
