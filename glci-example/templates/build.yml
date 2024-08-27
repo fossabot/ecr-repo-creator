@@ -10,6 +10,9 @@ spec:
     dockerfile_name:
       type: string
       default: Dockerfile
+    context_subdir:
+      type: string
+      default: ""
     tag_template:
       type: string
       default: ${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-${CI_PIPELINE_ID}
@@ -188,7 +191,8 @@ $[[ inputs.job_name ]]:
 
     - |
       # Define the proper Dockerfile
-      DOCKERFILE="${CI_PROJECT_DIR}/${$[[ inputs.env_var_prefix ]]_DOCKERFILE_NAME:-$[[ inputs.dockerfile_name ]]}"
+      CONTEXT_SUBDIR="${$[[ inputs.env_var_prefix ]]_CONTEXT_SUBDIR:-$[[ inputs.context_subdir ]]}"
+      DOCKERFILE="${CI_PROJECT_DIR}/${CONTEXT_SUBDIR%%/}/${$[[ inputs.env_var_prefix ]]_DOCKERFILE_NAME:-$[[ inputs.dockerfile_name ]]}"
       if [ -n "${COMPONENT:-}" ]; then
         if [ -e "${CI_PROJECT_DIR}/docker/build/${COMPONENT}/Dockerfile" ]; then
           DOCKERFILE="${CI_PROJECT_DIR}/docker/build/${COMPONENT}/Dockerfile"
@@ -292,7 +296,7 @@ $[[ inputs.job_name ]]:
       echo --single-snapshot=$SINGLE_SNAPSHOT >>$KE_ARG_FILE
 
       echo --image-name-tag-with-digest-file=/dev/termination-log >>$KE_ARG_FILE
-      echo --context=${CI_PROJECT_DIR} >>$KE_ARG_FILE
+      echo --context=${CI_PROJECT_DIR}/${CONTEXT_SUBDIR} >>$KE_ARG_FILE
       echo "--dockerfile=${DOCKERFILE}" >>$KE_ARG_FILE
       for TAG in $IMG_TAGS; do
         echo --destination=$IMAGE_NAME:$TAG >>$KE_ARG_FILE
