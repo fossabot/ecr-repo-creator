@@ -158,13 +158,16 @@ $[[ inputs.job_name ]]:
         export AWS_ACCESS_KEY_ID="${ECR_DIST_CREDS_AWS_ACCESS_KEY_ID}"
         export AWS_SECRET_ACCESS_KEY="${ECR_DIST_CREDS_AWS_SECRET_ACCESS_KEY}"
         export REGISTRY_HOST="${ECR_DIST_REGISTRY}"
+      else
+        export REGISTRY_HOST="${CI_REGISTRY}"
+        export ENABLE_CACHE=false
       fi
 
     - |-
       # Define image name and setup docker creds
       IMAGE_NAME=${REGISTRY_HOST}/dist/images/${CI_SERVER_HOST}/${CI_PROJECT_PATH}
       CACHE_REPO=${REGISTRY_HOST}/dist/cache/kaniko/${CI_SERVER_HOST}/${CI_PROJECT_PATH}
-      echo "{\"credHelpers\":{\"${REGISTRY_HOST}\":\"ecr-login\"},\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+      echo "{\"credHelpers\":{\"${REGISTRY_HOST}\":\"ecr-login\"},\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER:-none}" "${CI_REGISTRY_PASSWORD:-none}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
 
     - |-
       # Define tag(s)
@@ -221,18 +224,20 @@ $[[ inputs.job_name ]]:
     - |-
       # Section ECR setup
       echo -e "\e[0Ksection_start:`date +%s`:ecr_setup\r\e[0K\e[4m[*] ECR setup\e[0m"
-      ecr-repo-creator "${IMAGE_NAME}"
+      if [ "${GITLAB_CI:-}" != false -o "${GITLAB_CI_LOCAL_PUSH_ANYWAY:-false}" = true ]; then # gitlab-ci-local
+        ecr-repo-creator "${IMAGE_NAME}"
 
-      ENABLE_CACHE=$[[ inputs.cache ]]
-      case "${$[[ inputs.env_var_prefix ]]_KANIKO_ENABLE_CACHE:-default}" in
-        true)
-          ENABLE_CACHE=true
-          ;;
-        false)
-          ENABLE_CACHE=false
-          ;;
-      esac
-      \[ "$ENABLE_CACHE" = "true" ] && LIFECYCLE_POLICY=${ECR_DIST_CACHE_LIFECYCLE_POLICY:-} ecr-repo-creator "$CACHE_REPO"
+        ENABLE_CACHE=$[[ inputs.cache ]]
+        case "${$[[ inputs.env_var_prefix ]]_KANIKO_ENABLE_CACHE:-default}" in
+          true)
+            ENABLE_CACHE=true
+            ;;
+          false)
+            ENABLE_CACHE=false
+            ;;
+        esac
+        [ "$ENABLE_CACHE" = "true" ] && LIFECYCLE_POLICY=${ECR_DIST_CACHE_LIFECYCLE_POLICY:-} ecr-repo-creator "$CACHE_REPO"
+      fi
 
       echo -e "\e[0Ksection_end:`date +%s`:ecr_setup\r\e[0K"
 
@@ -246,8 +251,8 @@ $[[ inputs.job_name ]]:
 
 
       # cache
-      echo --cache-repo=${CACHE_REPO} >>$KE_ARG_FILE
       echo --cache=$ENABLE_CACHE >>$KE_ARG_FILE
+      [ "${ENABLE_CACHE}" = true ] && echo --cache-repo=${CACHE_REPO} >>$KE_ARG_FILE
 
       # cache-copy-layers
       CACHE_COPY_LAYERS=$[[ inputs.cache_copy_layers ]]
