@@ -41,8 +41,8 @@ For Kaniko version: https://github.com/GoogleContainerTools/kaniko/releases
 For Golang version: https://hub.docker.com/_/golang
 
 
-A prebuilt image of `kaniko` with `ecr-repo-creator` and `jq` is available at [beardedbabs/kaniko-w-ecr-repo-creator](https://hub.docker.com/r/beardedbabs/kaniko-w-ecr-repo-creator) 
+A prebuilt image of `kaniko` with `ecr-repo-creator`, `jq` and `envsubst` is available at [ghcr.io/babs/kaniko-w-ecr-repo-creator](https://github.com/babs/ecr-repo-creator/pkgs/container/kaniko-w-ecr-repo-creator)
 
 ```bash
-docker pull beardedbabs/kaniko-w-ecr-repo-creator:latest
+docker pull ghcr.io/babs/kaniko-w-ecr-repo-creator:1
 ```

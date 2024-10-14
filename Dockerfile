@@ -17,6 +17,8 @@ RUN set -xe \
 
 FROM gcr.io/kaniko-project/executor:${KANIKO_VERSION}-debug AS final-stage
 
+LABEL org.opencontainers.image.source=https://github.com/babs/ecr-repo-creator
+
 COPY --from=ghcr.io/jqlang/jq /jq /usr/local/bin/
 COPY --from=golang-am8-envsubst /go/bin/envsubst /usr/local/bin/
 COPY --from=build-stage /app/ecr-repo-creator /usr/local/bin/

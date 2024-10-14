@@ -111,7 +111,7 @@ variables:
 $[[ inputs.job_name ]]:
   stage: $[[ inputs.stage ]]
   image:
-      name: beardedbabs/kaniko-w-ecr-repo-creator:latest
+      name: ghcr.io/babs/kaniko-w-ecr-repo-creator:1
       entrypoint: [""]
   tags:
     - $[[ inputs.runner_tags ]]
