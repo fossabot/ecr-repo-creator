@@ -4,9 +4,9 @@ spec:
       default: shared-services
     stage:
       default: build
-    job_name:
+    job_suffix:
       type: string
-      default: build oci image
+      default: ""
     dockerfile_name:
       type: string
       default: Dockerfile
@@ -16,6 +16,9 @@ spec:
     tag_template:
       type: string
       default: ${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-${CI_PIPELINE_ID}
+    tag_suffix:
+      type: string
+      default: ""
     dependencies:
       type: array
       default: []
@@ -34,9 +37,12 @@ spec:
       options:
         - "true"
         - "false"
-    parallel_matrix:
+    variants:
       type: array
-      default: [{"default_for_single_job":["🛠️"]}]
+      default: ["🛠️"]
+    matrix_key:
+      type: string
+      default: VARIANT
     rules:
       type: array
       default:
@@ -105,7 +111,7 @@ variables:
       - "false"
     description: "If semver tag is declined, keep the release"
 
-$[[ inputs.job_name ]]:
+build oci image $[[ inputs.job_suffix ]]$[[ inputs.tag_suffix ]]:
   stage: $[[ inputs.stage ]]
   image:
       name: ghcr.io/babs/kaniko-w-ecr-repo-creator:1
@@ -118,7 +124,7 @@ $[[ inputs.job_name ]]:
     - $[[ inputs.dependencies ]]
   parallel:
     matrix:
-      - $[[ inputs.parallel_matrix ]]
+      - $[[ inputs.matrix_key ]]: $[[ inputs.variants ]]
   before_script:
     - $[[ inputs.before_script ]]
 
@@ -166,6 +172,8 @@ $[[ inputs.job_name ]]:
 
     - |-
       # Define tag(s)
+      TAG_SUFFIX="$[[ inputs.tag_suffix ]]"
+      [ -n "$TAG_SUFFIX" ] && TAG_SUFFIX="-$TAG_SUFFIX"
       if [ -n "${CI_COMMIT_TAG:-}" ]; then
         IMG_TAGS=${CI_COMMIT_TAG#v}
         if [ "${$[[ inputs.env_var_prefix ]]_SEMVER_MULTITAG}" = "true" -a -n "$(echo $IMG_TAGS | grep -iE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.-]+)?$')" ]; then
@@ -177,10 +185,10 @@ $[[ inputs.job_name ]]:
           esac
           SEMVER_CORE="${IMG_TAGS%%-*}"
           [ "${$[[ inputs.env_var_prefix ]]_SEMVER_MULTITAG_INC_REL}" = "false" ] && RELEASE=""
-          IMG_TAGS="$IMG_TAGS ${SEMVER_CORE%.*}${RELEASE} ${SEMVER_CORE%%.*}${RELEASE}"
+          IMG_TAGS="${IMG_TAGS}${TAG_SUFFIX} ${SEMVER_CORE%.*}${RELEASE}${TAG_SUFFIX} ${SEMVER_CORE%%.*}${RELEASE}${TAG_SUFFIX}"
         fi
       else
-        IMG_TAGS="$[[ inputs.tag_template ]]"
+        IMG_TAGS="$[[ inputs.tag_template ]]${TAG_SUFFIX}"
       fi
 
       [ -n "${$[[ inputs.env_var_prefix ]]_FORCE_TAG:-}" ] && IMG_TAGS="${$[[ inputs.env_var_prefix ]]_FORCE_TAG}"
@@ -191,24 +199,34 @@ $[[ inputs.job_name ]]:
 
     - |
       # Define the proper Dockerfile
+
+      # if variant is 🛠️, it's default so no variant => unset
+      [ "${VARIANT:-}" = "🛠️" ] && unset VARIANT
+
       CONTEXT_SUBDIR="${$[[ inputs.env_var_prefix ]]_CONTEXT_SUBDIR:-$[[ inputs.context_subdir ]]}"
-      DOCKERFILE="$(echo "${CI_PROJECT_DIR}/${CONTEXT_SUBDIR}/${$[[ inputs.env_var_prefix ]]_DOCKERFILE_NAME:-$[[ inputs.dockerfile_name ]]}" | tr -s /)"
-      if [ -n "${COMPONENT:-}" ]; then
-        if [ -e "${CI_PROJECT_DIR}/docker/build/${COMPONENT}/Dockerfile" ]; then
-          DOCKERFILE="${CI_PROJECT_DIR}/docker/build/${COMPONENT}/Dockerfile"
-          IMAGE_NAME="${IMAGE_NAME}/${COMPONENT}"
-          CACHE_REPO="${CACHE_REPO}/${COMPONENT}"
+      DOCKERFILE="$(echo "${CONTEXT_SUBDIR}/${$[[ inputs.env_var_prefix ]]_DOCKERFILE_NAME:-$[[ inputs.dockerfile_name ]]}" | tr -s /)"
+      DOCKERFILE="${DOCKERFILE##/}"
+      if [ -n "${VARIANT:-}" ]; then
+        if [ -e "${CI_PROJECT_DIR}/docker/build/${VARIANT}/Dockerfile" ]; then
+          DOCKERFILE="docker/build/${VARIANT}/Dockerfile"
+          IMAGE_NAME="${IMAGE_NAME}/${VARIANT}"
+          CACHE_REPO="${CACHE_REPO}/${VARIANT}"
+        elif [ -e "${CI_PROJECT_DIR}/${VARIANT}/Dockerfile" ]; then
+          DOCKERFILE="${VARIANT}/Dockerfile"
+          IMAGE_NAME="${IMAGE_NAME}/${VARIANT}"
+          CACHE_REPO="${CACHE_REPO}/${VARIANT}"
+          CONTEXT_SUBDIR="${CONTEXT_SUBDIR:-$VARIANT}"
         else
-          error_banner "component specified but no Dockerfile found at:\n${CI_PROJECT_DIR}/docker/build/${COMPONENT}/Dockerfile"
+          error_banner "variant specified but no Dockerfile found at:\ndocker/build/${VARIANT}/Dockerfile nor ${VARIANT}/Dockerfile"
           exit 1
         fi
       fi
 
-      [ ! -e "$DOCKERFILE" ] && error_banner "No Dockerfile found at:\n$DOCKERFILE" && exit 2
+      [ ! -e "${CI_PROJECT_DIR}/$DOCKERFILE" ] && error_banner "No Dockerfile found at:\n$DOCKERFILE" && exit 2
 
     - |
       # Print essential informations
-      [ -n "${COMPONENT:-}" ] && echo "Building component: $COMPONENT"
+      [ -n "${VARIANT:-}" ] && echo "Building variant: $VARIANT"
       echo "Docker file in use: $DOCKERFILE"
       echo "Image will be pushed to: $IMAGE_NAME"
       echo "Image will be tagged as: $(echo $IMG_TAGS | sed -re "s/ +/, /g")"
@@ -299,16 +317,32 @@ $[[ inputs.job_name ]]:
 
       echo --image-name-tag-with-digest-file=/dev/termination-log >>$KE_ARG_FILE
       echo --context=${CI_PROJECT_DIR}/${CONTEXT_SUBDIR} >>$KE_ARG_FILE
-      echo "--dockerfile=${DOCKERFILE}" >>$KE_ARG_FILE
+      echo "--dockerfile=${CI_PROJECT_DIR}/${DOCKERFILE}" >>$KE_ARG_FILE
+      MAIN_TAG=""
       for TAG in $IMG_TAGS; do
+        [ -z "$MAIN_TAG" ] && MAIN_TAG="$TAG"
         echo --destination=$IMAGE_NAME:$TAG >>$KE_ARG_FILE
       done
       echo '$[[ inputs.build_args ]]' | jq -r '.[]|("--build-arg="+.)' >>$KE_ARG_FILE
       echo '$[[ inputs.build_args_w_subst ]]' | jq -r '.[]|("--build-arg="+.)' | envsubst >>$KE_ARG_FILE
-      echo --label=CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME >>$KE_ARG_FILE
-      echo --label=CI_JOB_URL=$CI_JOB_URL >>$KE_ARG_FILE
-      echo --label=CI_JOB_STARTED_AT=$CI_JOB_STARTED_AT >>$KE_ARG_FILE
-      echo --label=CI_PROJECT_URL=$CI_PROJECT_URL >>$KE_ARG_FILE
+
+      for PREFIX in label build-arg; do
+        echo --${PREFIX}=MAIN_TAG=${MAIN_TAG:-} >>$KE_ARG_FILE
+        echo --${PREFIX}=ALL_TAGS=${IMG_TAGS:-} >>$KE_ARG_FILE
+        echo --${PREFIX}=VARIANT=${VARIANT:-} >>$KE_ARG_FILE
+        echo --${PREFIX}=CI_COMMIT_TAG=${CI_COMMIT_TAG:-} >>$KE_ARG_FILE
+        echo --${PREFIX}=CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME >>$KE_ARG_FILE
+        echo --${PREFIX}=CI_JOB_URL=$CI_JOB_URL >>$KE_ARG_FILE
+        echo --${PREFIX}=CI_JOB_STARTED_AT=$CI_JOB_STARTED_AT >>$KE_ARG_FILE
+        echo --${PREFIX}=CI_PROJECT_URL=$CI_PROJECT_URL >>$KE_ARG_FILE
+        [ "$[[ inputs.matrix_key ]]" != "VARIANT" ] && echo "--${PREFIX}=$[[ inputs.matrix_key ]]=${$[[ inputs.matrix_key ]]}" >>$KE_ARG_FILE
+      done
+
+      # Standard Annotations
+      echo --label=org.opencontainers.image.source=$CI_PROJECT_URL >>$KE_ARG_FILE
+      echo --label=org.opencontainers.image.created=$CI_JOB_STARTED_AT >>$KE_ARG_FILE
+      echo --label=org.opencontainers.image.version=$CI_COMMIT_REF_NAME >>$KE_ARG_FILE
+      echo --label=org.opencontainers.image.revision=$CI_COMMIT_SHA >>$KE_ARG_FILE
 
       [ "${GITLAB_CI:-}" = false -a "${GITLAB_CI_LOCAL_PUSH_ANYWAY:-false}" != true ] && echo --no-push >>$KE_ARG_FILE # gitlab-ci-local
 
